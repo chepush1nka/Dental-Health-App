@@ -1,44 +1,45 @@
-import cv2
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+import ultralytics
+from ultralytics import YOLO
+import cv2 as cv
 
-def load_image(file_path):
+MIN_CONF = 0.5
+A3 = 3
+A35 = 3.5
+A4 = 4
+
+
+# you can turn this option on to check for different issues with the pretrained model, but it takes some time
+# ultralytics.checks()
+
+def load_image(photo_encoded):
     # image = cv2.imread(file_path)
-    image = cv2.imdecode(file_path, cv2.IMREAD_COLOR)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv.imdecode(photo_encoded, cv.IMREAD_COLOR)
     return image
 
-def extract_colors(image, num_colors=3):
 
-    pixels = image.reshape((-1, 3))
+def determine_tooth_color(photo_encoded):
+    image = load_image(photo_encoded)
 
-
-    kmeans = KMeans(n_clusters=num_colors)
-    kmeans.fit(pixels)
-
-
-    colors = kmeans.cluster_centers_
-
-
-    colors /= 255.0
-
-    return colors
-
-
-def determine_tooth_color(image_path):
-
-    image = load_image(image_path)
-
-
-    colors = extract_colors(image)
-
-
-    avg_color = np.mean(colors, axis=0)
-    tooth_color = "white" if np.max(avg_color) > 0.8 else "yellow"
-
-    return tooth_color
-
-# image_path = "/content/i-35-35-1536x1004.jpeg"
-# tooth_color = determine_tooth_color(image_path)
-# print(f"The tooth color is {tooth_color}.")
+    model = YOLO(f'detect/weights/best.pt')
+    results = model.predict(source=image, save=True)  # you can set "save = True" to see the exact detection
+    mean_prob = 0
+    total_num = 0
+    for result in results:
+        names = result.names
+        confidences = result.boxes.conf.numpy()
+        print(confidences)
+        labels = result.boxes.cls.numpy()
+        for i in range(len(labels)):
+            if confidences[i] > MIN_CONF:
+                total_num += 1
+                float_colour = float(names[labels[i]][1:])
+                mean_prob += float_colour
+    ans = mean_prob / total_num
+    dist_1 = abs(A35 - ans)
+    dist_2 = abs(A3 - ans)
+    dist_3 = abs(A4 - ans)
+    if dist_1 < dist_2 and dist_1 < dist_3:
+        ans = A35
+    if ans != A35:
+        ans = round(ans)
+    return "A" + str(ans)
