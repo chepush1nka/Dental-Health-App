@@ -10,20 +10,28 @@ import json
 app = Flask(__name__)
 api = Api(app)
 
+BITE = 3
+COLOR = 2
+
 
 class RecommendationService:
     def __init__(self):
         self.conn = sqlite3.connect('bite.db', check_same_thread=False)
         self.cursor = self.conn.cursor()
 
-    def fetch_recommendations(self, color_result, bite_result):
-        self.cursor.execute('SELECT description, products from recommendations WHERE name == ?', (bite_result,))
-        bite_rec = self.cursor.fetchone()
+    def fetch_recommendations_color(self, color_result):
         self.cursor.execute('SELECT description, products from colour_recommendations WHERE name == ?', (color_result,))
         color_rec = self.cursor.fetchone()
-        if bite_rec is None or color_rec is None:
+        if color_rec is None:
             return "ERROR"
-        return str((bite_rec, color_rec))
+        return str(color_rec)
+
+    def fetch_recommendations_bite(self, bite_result):
+        self.cursor.execute('SELECT description, products from recommendations WHERE id == ?', (bite_result,))
+        bite_rec = self.cursor.fetchone()
+        if bite_rec is None:
+            return "ERROR"
+        return str(bite_rec)
 
 
 class ColorAnalysisModel:
@@ -33,7 +41,7 @@ class ColorAnalysisModel:
 
 class BiteAnalysisModel:
     def analyze_photo(self, photo):
-        return "Дистальный прикус"
+        return 1
 
 
 class PhotoAnalysisService:
@@ -50,32 +58,38 @@ class APIController:
     def __init__(self):
         self.analysis_service = PhotoAnalysisService()
 
-    def handle_photo_upload(self):
+    def handle_photo_upload(self, number):
         try:
-            base64.b64decode(request.get_json().get('user_photo'))
+            for i in range(number):
+                base64.b64decode(request.get_json().get(f'user_photo_{i}'))
         except:
-            return "Can't upload your photo", 400
-        return request.get_json().get('user_photo'), 201
+            return f"Upload {number} photos again", 400
 
-    def handle_analysis_request(self):
-        photo = base64.b64decode(request.get_json().get('user_photo'))
+        return request.get_json(), 201
+
+    def handle_analysis_request(self, number):
+        photo = []
         try:
-            photo = np.frombuffer(photo, np.uint8)
+            for i in range(number):
+                photo_now = base64.b64decode(request.get_json().get(f'user_photo_{i}'))
+                photo.append(np.frombuffer(photo_now, np.uint8))
         except:
-            return "Upload another picture, please", 400
-        color_result = self.analysis_service.analyze_color(photo)
-        bite_result = self.analysis_service.analyze_bite(photo)
-        return jsonify({
-            'color_analysis': color_result,
-            'bite_analysis': bite_result
-        }), 201
+            return "Upload different pictures, please", 400
+        if number == COLOR:
+            color_result = self.analysis_service.analyze_color(photo)
+            return str(color_result), 201
+        else:
+            bite_result = self.analysis_service.analyze_bite(photo)
+            return str(bite_result), 201
 
-    def provide_recommendations(self):
+    def provide_recommendations(self, number):
         results = request.get_json()
-        color_ans = json.loads(results["analysis_result"])["color_analysis"]
-        bite_ans = json.loads(results["analysis_result"])["bite_analysis"]
+        ans = results.get('analysis_result')
         service = RecommendationService()
-        recommendations = service.fetch_recommendations(color_ans, bite_ans)
+        if number == COLOR:
+            recommendations = service.fetch_recommendations_color(ans)
+        else:
+            recommendations = service.fetch_recommendations_bite(ans)
         if recommendations == "ERROR":
             return "Can't procces the recommendations", 400
         return recommendations, 200
@@ -84,19 +98,34 @@ class APIController:
 controller = APIController()
 
 
-@app.route('/handle_photo_upload', methods=['POST'])
-def upload():
-    return controller.handle_photo_upload()
+@app.route('/handle_photo_upload_color', methods=['POST'])
+def upload_color():
+    return controller.handle_photo_upload(COLOR)
 
 
-@app.route('/handle_analysis_request', methods=['POST'])
-def request_analysis():
-    return controller.handle_analysis_request()
+@app.route('/handle_photo_upload_bite', methods=['POST'])
+def upload_bite():
+    return controller.handle_photo_upload(BITE)
 
 
-@app.route('/provide_recommendations', methods=['GET'])
-def provide():
-    return controller.provide_recommendations()
+@app.route('/handle_analysis_request_bite', methods=['POST'])
+def request_analysis_bite():
+    return controller.handle_analysis_request(BITE)
+
+
+@app.route('/handle_analysis_request_color', methods=['POST'])
+def request_analysis_color():
+    return controller.handle_analysis_request(COLOR)
+
+
+@app.route('/provide_recommendations_color', methods=['GET'])
+def provide_color():
+    return controller.provide_recommendations(COLOR)
+
+
+@app.route('/provide_recommendations_bite', methods=['GET'])
+def provide_bite():
+    return controller.provide_recommendations(BITE)
 
 
 if __name__ == '__main__':
