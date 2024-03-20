@@ -7,6 +7,7 @@ from model import determine_tooth_color
 
 import sqlite3
 import json
+
 app = Flask(__name__)
 api = Api(app)
 
@@ -24,14 +25,14 @@ class RecommendationService:
         color_rec = self.cursor.fetchone()
         if color_rec is None:
             return "ERROR"
-        return str(color_rec)
+        return str([color_rec, color_result])
 
     def fetch_recommendations_bite(self, bite_result):
         self.cursor.execute('SELECT description, products from recommendations WHERE id == ?', (bite_result,))
         bite_rec = self.cursor.fetchone()
         if bite_rec is None:
             return "ERROR"
-        return str(bite_rec)
+        return str([bite_rec, bite_result])
 
 
 class ColorAnalysisModel:
