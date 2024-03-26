@@ -1,0 +1,11 @@
+.DS_Store
+/build
+/captures
+.cxx
+local.properties
+
+/.build
+DerivedData/
+build/
+xcuserdata
+Pods/
