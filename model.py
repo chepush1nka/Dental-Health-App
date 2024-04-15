@@ -18,7 +18,7 @@ def load_image(photo_encoded):
 
 
 def determine_tooth_color(photo_encoded):
-    image = load_image(photo_encoded)
+    image = load_image(photo_encoded[0])
 
     model = YOLO(f'detect/weights/best.pt')
     results = model.predict(source=image, save=True)  # you can set "save = True" to see the exact detection
